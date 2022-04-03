@@ -44,7 +44,9 @@ public:
 
     string getCNP() const;
 
-    void setID();
+    void setID(int ID);
+
+    int getID() {return ID;};
 };
 
 int Person::IDglobal = 0;
@@ -106,8 +108,8 @@ string Person::getCNP() const {
     return CNP;
 }
 
-void Person::setID() {
-    if(ID==0) ID=IDglobal++;
+void Person::setID(int ID) {
+    this->ID=ID;
 }
 
 
@@ -342,13 +344,7 @@ public:
 
     string getPhoneNumber () {return phoneNumber;};
 
-    float getSubscriptionPrice();
-
-    int getSubscriptionPeriod();
-
-    int getSubscriptionDiscount();
-
-    Subscription* getSubscriptionPointer();
+    Subscription* getSubscription() {return x;};
 };
 
 Subscriber::Subscriber(const string &name, const string &CNP, const string &phoneNumber, const string &subscriptionName, float price, int period, int discount):
@@ -458,22 +454,6 @@ void Subscriber::setPhoneNumber (const string &phoneNumber) {
     else this->phoneNumber=phoneNumber;
 }
 
-float Subscriber::getSubscriptionPrice () {
-    return x->getPrice();
-}
-
-int Subscriber::getSubscriptionPeriod () {
-    return x->getPeriod();
-}
-
-int Subscriber::getSubscriptionDiscount () {
-    if (PremiumSubscription *discount=dynamic_cast<PremiumSubscription*>(x))
-        return discount->getDiscount();
-}
-
-Subscription* Subscriber::getSubscriptionPointer() {
-    return x;
-}
 
 
 
@@ -497,11 +477,13 @@ public:
 
     int getNumberOfClients () const {return numberOfClients;};
 
+    Subscriber* getSubscribers () {return subscribers;}
+
     int getNumberOfPremiumSubscribers ();
 
     float getTotalEarnings ();
 
-    void printSubscriber (int ID);
+    void deleteClients();
 };
 
 Clients::Clients() {
@@ -570,7 +552,7 @@ istream& operator>>(istream &in, Clients &clients) {
 int Clients::getNumberOfPremiumSubscribers () {
     int premiumSubscribers=0;
     for (int i=0; i<this->numberOfClients; i++) {
-        if (dynamic_cast<PremiumSubscription*>((this->subscribers+i)->getSubscriptionPointer())) premiumSubscribers++;
+        if (dynamic_cast<PremiumSubscription*>((this->subscribers+i)->getSubscription())) premiumSubscribers++;
     }
     return premiumSubscribers;
 }
@@ -578,24 +560,24 @@ int Clients::getNumberOfPremiumSubscribers () {
 float Clients::getTotalEarnings () {
     float value=0;
     for (int i=0; i<this->numberOfClients; i++)
-        if (dynamic_cast<PremiumSubscription*>(this->subscribers+i)) {
-            value += this->subscribers[i].getSubscriptionPrice() * (float) subscribers[i].getSubscriptionPeriod();
-            value -= value * ((float)this->subscribers[i].getSubscriptionDiscount()/100);
+        if (PremiumSubscription *premium=dynamic_cast<PremiumSubscription*>(this->subscribers+i)) {
+            value += this->subscribers[i].getSubscription()->getPrice() * (float) subscribers[i].getSubscription()->getPeriod();
+            value -= value * ((float)premium->getDiscount()/100);
         }
-        else value+=this->subscribers[i].getSubscriptionPrice()*(float)subscribers[i].getSubscriptionPeriod();
+        else value+=this->subscribers[i].getSubscription()->getPrice()*(float)subscribers[i].getSubscription()->getPeriod();
     return value;
 }
 
-void Clients::printSubscriber (int ID) {
-    cout<<subscribers[ID];
+void Clients::deleteClients () {
+    numberOfClients=0;
+    delete[]subscribers;
+    subscribers=new Subscriber[200];
 }
-
 
 
 
 int main() {
-    Clients clients;
-    Subscriber *VIPclients;
+    Clients clients, VIPclients;
     int n, command = -3, option1 = -3, option2 = -3, option3;
     float option4;
     string auxiliary;
@@ -614,23 +596,23 @@ int main() {
         cout << ">>> Enter the number of VIP clients: ";
         cin >> n;
     }
-    VIPclients=new Subscriber[n];
+    VIPclients=Clients(clients);
+    VIPclients.deleteClients();
+
 
     for (int i=0; i<n; i++) {
         cout << ">>> Enter the ID of a VIP client: ";
         cin >> option1;
 
-        while (option1)
-    }
+        while (option1<0 or option1>=clients.getNumberOfClients()) {
+            cout << "Error: client IDs must be positive and cannot exceed maximum ID number\n";
+            cout << ">>> Enter the ID of a VIP client: ";
+            cin >> option1;
+        }
 
-    cin >> option1;
-    while (option1 > n or option1 <= 0) {
-        cout << "Error: book IDs must be positive, non-null and cannot exceed total book number\n";
-        cout << ">>> Enter the ID of your favourite book: ";
-        cin >> option1;
+        (VIPclients.getSubscribers())[i]=clients.getSubscribers()[option1];
+        (VIPclients.getSubscribers())[i].setID(clients.getSubscribers()[option1].getID());
     }
-    option1--;
-    carte favourite(books[option1]);
 
     // program functions and instructions listing
     cout << "\nCliently employs the following functions:\n";
@@ -698,78 +680,92 @@ int main() {
                         option2--;
                         switch (option1) {
                             case 1:         // modify client name
-                                cout << ">>> Enter a new name for \"" <<  << "\": ";
+                                cout << ">>> Enter a new name for \"" << clients.getSubscribers()[option2].getName() << "\": ";
                                 cin>>auxiliary;
-                                // MODIFY CLIENT NAME
-
+                                clients.getSubscribers()[option2].setName(auxiliary);
                                 cout << "Client name has been modified\n";
                                 break;
 
                             case 2:         // modify client CNP
-                                cout << ">>> Enter a new CNP for \"" <<  << "\": ";
+                                cout << ">>> Enter a new CNP for \"" << clients.getSubscribers()[option2].getName() << "\": ";
+
                                 cin>>auxiliary;
-                                // MODIFY CLIENT CNP
+                                while(!isNumber(auxiliary) or auxiliary.length()!=13) {
+                                    cout<<"Error: CNP must be numerical and must contain exactly 13 digits\n";
+                                    cout<<">>> Enter a valid CNP: ";
+                                    cin>>auxiliary;
+                                }
+                                clients.getSubscribers()[option2].setCNP(auxiliary);
 
                                 cout << "CNP has been modified\n";
                                 break;
 
                             case 3:         // modify client phone number
-                                cout << ">>> Enter a new phone number for \"" <<  << "\": ";
+                                cout << ">>> Enter a new phone number for \"" << clients.getSubscribers()[option2].getName() << "\": ";
+
                                 cin>>auxiliary;
-                                // MODIFY CLIENT PHONE NUMBER
+                                while(!isNumber(auxiliary) or auxiliary.length()!=10) {
+                                    cout<<"Error: Phone number must be numerical and must contain exactly 10 digits\n";
+                                    cout<<">>> Enter a valid phone number: ";
+                                    cin>>auxiliary;
+                                }
+                                clients.getSubscribers()[option2].setPhoneNumber(auxiliary);
 
                                 cout << "Phone number has been modified\n";
                                 break;
 
                             case 4:         //  modify subscription type
-                                cout << ">>> Enter a new subscription type for \"" <<  << "\": ";
-                                cin>>auxiliary;
-                                // MODIFY SUBSCRIPTION TYPE
+                                cout << ">>> Enter a new subscription type for \"" << clients.getSubscribers()[option2].getName() << "\": ";
 
-//                                cin >> option3;
-//                                while (option3 < 0) {
-//                                    cout << "Error: Number of pages must be a positive number\n";
-//                                    cout << ">>> Enter a new number of pages for \"" << books[option2].getDenumire() << "\": ";
-//                                    cin >> option3;
-//                                }
-//                                books[option2].setPagini(option3);
+                                cin>>auxiliary;
+                                while(toLower(auxiliary)!="individual" and toLower(auxiliary)!="Dual" and toLower(auxiliary)!="Family") {
+                                    cout<<"Error: Subscription Type can be 'Individual', 'Dual' or 'Family'\n";
+                                    cout<<">>> Enter a valid subscription type: ";
+                                    cin>> auxiliary;
+                                }
+                                clients.getSubscribers()[option2].setName(auxiliary);
+
                                 cout << "Subscription Type has been modified\n";
                                 break;
 
                             case 5:         // modify subscription price
-                                cout << ">>> Enter a new subscription price for \"" << << "\": ";
+                                cout << ">>> Enter a new subscription price for \"" << clients.getSubscribers()[option2].getName() << "\": ";
+
                                 cin >> option4;
                                 while (option4 < 0.0) {
                                     cout<<"Error: Subscription price must be a positive floating-point number\n ";
-                                    cout << ">>> Enter a new subscription price for \"" << << "\": ";
+                                    cout << ">>> Enter a new subscription price for \"" << clients.getSubscribers()[option2].getName() << "\": ";
                                     cin>>option4;
                                 }
-                                clients.subscribers[option2].setPret(option4);
+                                clients.getSubscribers()[option2].getSubscription()->setPrice(option4);
+
                                 cout << "Subscription price has been modified\n";
                                 break;
 
                             case 6:         // modify contract period
-                                cout << ">>> Enter a new contract period for \"" <<  << "\": ";
+                                cout << ">>> Enter a new contract period for \"" << clients.getSubscribers()[option2].getName() << "\": ";
+
                                 cin >> option3;
                                 while (option3 < 0) {
                                     cout<<"Error: Subscription period must be a positive integer\n";
-                                    cout << ">>> Enter a new contract period for \"" <<  << "\": ";
+                                    cout << ">>> Enter a new contract period for \"" << clients.getSubscribers()[option2].getName() << "\": ";
                                     cin >> option3;
                                 }
-                                // MODIFY CONTRACT PERIOD
+                                clients.getSubscribers()[option2].getSubscription()->setPeriod(option3);
 
                                 cout << "Contract period has been modified\n";
                                 break;
 
-                            case 7:
-                                cout<<"Enter a new subscription discount for \"" << << "\": ";
+                            case 7:         // modify subscription discount
+                                cout<<"Enter a new subscription discount for \"" << clients.getSubscribers()[option2].getName() << "\": ";
+
                                 cin >> option3;
                                 while (option3 < 0) {
                                     cout<<"Error: Subscription discount must be between 0 and 100\n";
-                                    cout << ">>> Enter a new contract period for \"" <<  << "\": ";
+                                    cout << ">>> Enter a new contract period for \"" << clients.getSubscribers()[option2].getName() << "\": ";
                                     cin >> option3;
                                 }
-                                // MODIFY CONTRACT PERIOD
+                                clients.getSubscribers()[option2].getSubscription()->setDiscount();
 
                                 cout<< "Subscription discount has been modified\n";
                                 break;
@@ -841,7 +837,7 @@ int main() {
                 } else if (option1 == -2) {       // quit
                     command = -2;
                     break;
-                } else clients.printSubscriber(option1);
+                } else cout<<clients.getSubscribers()[option1];
 
                 break;
 

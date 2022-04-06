@@ -31,7 +31,7 @@ public:
 
     virtual ~Person() {};
 
-    virtual int getIDglobal() { return IDglobal; }
+    static int getIDglobal() { return IDglobal; }
 
     Person &operator=(const Person &person);
 
@@ -46,8 +46,6 @@ public:
     void setCNP(string CNP);
 
     string getCNP() const;
-
-    int getID() { return ID; };
 };
 
 int Person::IDglobal = 1000;
@@ -89,7 +87,6 @@ istream &operator>>(istream &in, Person &person) {
 
 void Person::setName(const string &name) {
     this->name = name;
-    return;
 }
 
 string Person::getName() const {
@@ -110,9 +107,6 @@ string Person::getCNP() const {
     return CNP;
 }
 
-//void Person::setID(int ID) {
-//    this->ID=ID;
-//}
 
 
 
@@ -147,6 +141,8 @@ public:
     void setPeriod(int period);
 
     int getPeriod() const;
+
+    virtual float getEarnings();
 };
 
 Subscription::Subscription(const string &name, float price, int period) {
@@ -254,6 +250,12 @@ int Subscription::getPeriod() const {
     return period;
 }
 
+float Subscription::getEarnings() {
+    return price * (float)period;
+}
+
+
+
 
 class PremiumSubscription : public Subscription {
     int discount;
@@ -262,7 +264,7 @@ public:
 
     PremiumSubscription(const string &name, float price, int period, int discount);
 
-    PremiumSubscription(const PremiumSubscription &premium);
+    PremiumSubscription(PremiumSubscription &premium);
 
     ~PremiumSubscription() {};
 
@@ -275,6 +277,8 @@ public:
     void setDiscount(int discount);
 
     int getDiscount() const;
+
+    float getEarnings();
 };
 
 PremiumSubscription::PremiumSubscription(const string &name, float price, int period, int discount) : Subscription(name, price, period) {
@@ -287,7 +291,7 @@ PremiumSubscription::PremiumSubscription(const string &name, float price, int pe
     else this->discount = discount;
 }
 
-PremiumSubscription::PremiumSubscription(const PremiumSubscription &premium) :
+PremiumSubscription::PremiumSubscription(PremiumSubscription &premium) :
         Subscription(premium.getName(), premium.getPrice(), premium.getPeriod()) {
     discount = premium.discount;
 }
@@ -329,6 +333,12 @@ int PremiumSubscription::getDiscount() const {
     return discount;
 }
 
+float PremiumSubscription::getEarnings() {
+    return this->getPrice() * (float)this->getPeriod() - (this->getPrice() * (float)this->getPeriod() * ((float)discount/100));
+}
+
+
+
 
 class Subscriber : public Person {
     string phoneNumber;
@@ -343,7 +353,7 @@ public:
 
     ~Subscriber() {};
 
-    Subscriber &operator=(const Subscriber &subscriber);
+    Subscriber &operator=(Subscriber &subscriber);
 
     friend ostream &operator<<(ostream &out, const Subscriber &subscriber);
 
@@ -382,17 +392,11 @@ Subscriber::Subscriber(const Subscriber &subscriber) : Person(subscriber.getName
     phoneNumber = subscriber.phoneNumber;
 }
 
-Subscriber &Subscriber::operator=(const Subscriber &subscriber) {
+Subscriber &Subscriber::operator=(Subscriber &subscriber) {
     this->setName(subscriber.getName());
     this->setCNP(subscriber.getCNP());
     this->setID();
-    if (PremiumSubscription *construct = dynamic_cast<PremiumSubscription *>(subscriber.x)) {
-        PremiumSubscription toBeInserted = *construct;
-        x = &toBeInserted;
-    } else {
-        Subscription toBeInserted = *subscriber.x;
-        x = &toBeInserted;
-    }
+    x = &*(subscriber.x);
     this->phoneNumber = subscriber.phoneNumber;
     return *this;
 }
@@ -450,19 +454,21 @@ void Subscriber::setPhoneNumber(const string &phoneNumber) {
 }
 
 
+
+
 class Clients {
-    int numberOfClients=0;
+    int numberOfClients = 0;
     Subscriber subscribers[1000];
 public:
     Clients() {};
 
     Clients(Subscriber subscribers[], int numberOfClients);
 
-    Clients(const Clients &clients);
+    Clients(Clients &clients);
 
     ~Clients() {};
 
-    Clients &operator=(const Clients &clients);
+    Clients &operator=(Clients &clients);
 
     friend ostream &operator<<(ostream &out, const Clients &clients);
 
@@ -474,9 +480,9 @@ public:
 
     float getTotalEarnings();
 
-    Subscriber* getSubscribers() { return subscribers; }
+    Subscriber *getSubscribers() { return subscribers; }
 
-    void insertClient(Subscriber subscriber);
+    void copyClient(Clients clients, int index);
 
     void clearClients();
 };
@@ -493,13 +499,13 @@ Clients::Clients(Subscriber subscribers[], int numberOfClients) {
         this->subscribers[i] = subscribers[i];
 }
 
-Clients::Clients(const Clients &clients) {
+Clients::Clients(Clients &clients) {
     numberOfClients = clients.numberOfClients;
     for (int i = 0; i < numberOfClients; i++)
         subscribers[i] = clients.subscribers[i];
 }
 
-Clients &Clients::operator=(const Clients &clients) {
+Clients &Clients::operator=(Clients &clients) {
     numberOfClients = clients.numberOfClients;
     for (int i = 0; i < numberOfClients; i++)
         subscribers[i] = clients.subscribers[i];
@@ -508,8 +514,10 @@ Clients &Clients::operator=(const Clients &clients) {
 }
 
 ostream &operator<<(ostream &out, const Clients &clients) {
-    for (int i = 0; i < clients.numberOfClients; i++)
-        out << "Client " << i + 1 << ": " << clients.subscribers[i] << "\n";
+    for (int i = 0; i < clients.numberOfClients; i++) {
+        out << "Client " << i + 1 << ": " << clients.subscribers[i];
+        if (i != clients.numberOfClients - 1) cout << "\n";
+    }
     return out;
 }
 
@@ -544,20 +552,17 @@ int Clients::getNumberOfPremiumSubscribers() {
 
 float Clients::getTotalEarnings() {
     float value = 0;
-    for (int i = 0; i < this->numberOfClients; i++)
-        if (PremiumSubscription *premium = dynamic_cast<PremiumSubscription *>((this->subscribers + i)->getSubscription())) {
-            value += premium->getPrice() * (float) premium->getPeriod();
-            value -= value * ((float) premium->getDiscount() / 100);
-        } else value += this->subscribers[i].getSubscription()->getPrice() * (float) subscribers[i].getSubscription()->getPeriod();
+    for (int i = 0; i < numberOfClients; i++)
+        value += (subscribers+i)->getSubscription()->getEarnings();
     return value;
 }
 
-void Clients::insertClient(Subscriber subscriber) {
+void Clients::copyClient(Clients clients, int index) {
     if (numberOfClients == 1000) {
         cout << "Error: Client array already full\n";
         return;
     }
-    subscribers[numberOfClients++] = subscriber;
+    subscribers[numberOfClients++] = clients.subscribers[index];
 }
 
 void Clients::clearClients() {
@@ -565,8 +570,11 @@ void Clients::clearClients() {
 }
 
 
+
+
 int main() {
     Clients clients;
+    Subscriber favourite;
     int n, command = -3, option1 = -3, option2 = -3, option3;
     float option4;
     string auxiliary;
@@ -575,7 +583,7 @@ int main() {
     cout << "Welcome to Cliently v1.0 !\n..........LOADING...........\n\n";
     cin >> clients;
 
-    //  copying of VIP clients in pointer array 'VIPclients'
+    //  copying of VIP clients into array 'VIPclients'
     cout << "\nVIP client list is unmodifiable\n";
     cout << ">>> Enter the number of VIP clients: ";
 
@@ -600,23 +608,46 @@ int main() {
         }
         option1--;
 
-        VIPclients.insertClient((clients.getSubscribers())[option1]);
+        VIPclients.copyClient(clients, option1);
         VIPindex++;
+    }
+
+    //  copying of favourite client into 'favourite'
+    cout << "\nFavourite client is unmodifiable\n";
+    cout << ">>> Enter the ID of your favourite client: ";
+    cin >> option1;
+
+    while (option1 <= 0 or option1 > clients.getNumberOfClients()) {
+        cout << "Error: client ID must be positive and cannot exceed maximum ID number\n";
+        cout << ">>> Enter the ID of your favourite client: ";
+        cin >> option1;
+    }
+
+    if (PremiumSubscription *favouriteSubscription = dynamic_cast<PremiumSubscription *>(clients.getSubscribers()[option1 - 1].getSubscription())) {
+        Subscriber *x = &clients.getSubscribers()[option1 - 1];
+        Subscriber y(x->getName(), x->getCNP(), x->getPhoneNumber(), favouriteSubscription->getName(),
+                     favouriteSubscription->getPrice(), favouriteSubscription->getPeriod(), favouriteSubscription->getDiscount());
+        favourite = y;
+    } else {
+        Subscriber *x = &clients.getSubscribers()[option1 - 1];
+        Subscriber y(x->getName(), x->getCNP(), x->getPhoneNumber(), x->getSubscription()->getName(),
+                     x->getSubscription()->getPrice(), x->getSubscription()->getPeriod());
+        favourite = y;
     }
 
     // program functions and instructions listing
     cout << "\nCliently employs the following functions:\n";
     cout << "1) modify client data\n";
-    cout << "2) new client entry\n";
-    cout << "3) print the number of premium clients\n";
-    cout << "4) print the total earnings\n";
-    cout << "5) print client data by ID\n";
+    cout << "2) print the number of premium clients\n";
+    cout << "3) print the total earnings\n";
+    cout << "4) print client data by ID\n";
+    cout << "5) print favourite client\n";
     cout << "6) print VIP client(s)\n";
     cout << "7) print all stored clients\n\n";
     cout << "Instruction manual:\n";
     cout << "- function-menus can only be accessed by giving their ID number as input\n";
-    cout << "- to abort current function-menu, type \"-1\"\n";
-    cout << "- to quit the program, type \"-2\"\n";
+    cout << "- to abort current function-menu, type '-1'\n";
+    cout << "- to quit the program, type '-2'\n";
     cout << "- clients can only be identified by their order number in the list\n";
 
     while (command != -2) {
@@ -639,7 +670,7 @@ int main() {
                 cout << ">>> Enter a valid option or command ID: ";
                 cin >> option1;
 
-                while (option1 < -2 or option1 > 7 or option1==0) {
+                while (option1 < -2 or option1 > 7 or option1 == 0) {
                     cout << "Error: out of range modify-menu option (1-7) and command (-1,-2) IDs\n";
                     cout << ">>> Enter a valid option or command ID: ";
                     cin >> option1;
@@ -731,58 +762,15 @@ int main() {
                 }
                 break;
 
-
-            case 2:         // new-client-entry menu
-                cout << "New client entry options:\n";
-                cout << "1) default client entry\n";
-                cout << "2) input new client entry\n";
-                cout << ">>> Enter a valid option or command ID: ";
-
-                cin >> option1;
-                while (option1 > 2 or option1 < -2 or option1==0) {
-                    cout << "Error: out of range new-client-entry-menu option (1-2) and command (-1,-2) IDs\n";
-                    cout << ">>> Enter a valid option or command ID: ";
-                    cin >> option1;
-                }
-
-                switch (option1) {
-                    case -1: {              // abort
-                        cout << "Aborting\n";
-                        break;
-                    }
-                    case -2: {              // quit
-                        command = -2;
-                        break;
-                    }
-                    case 1: {
-                        Subscriber subscriber;
-                        clients.insertClient(subscriber);
-                        cout << "New client entry was initialized with the default values\n";
-                        break;
-                    }
-                    case 2: {
-                        Subscriber subscriber;
-                        cout << "Warning: A discount is only available for premium subscriptions. Type '0' in the discount field for a basic subscription\n";
-                        cout << ">>> Input a client in the following format, using ENTER as a delimiter:\n";
-                        cout << "ClientName    CNP    PhoneNumber    SubscriptionName    SubscriptionPrice    ContractPeriod    SubscriptionDiscount\n";
-                        cin  >> subscriber;
-                        clients.insertClient(subscriber);
-                        cout << "New client entry was initialized successfully\n";
-                        break;
-                    }
-                }
-                break;
-
-
-            case 3:
+            case 2:
                 cout << "The total number of premium clients: " << clients.getNumberOfPremiumSubscribers() << '\n';
                 break;
 
-            case 4:
+            case 3:
                 cout << "Total earnings: " << clients.getTotalEarnings() << "€\n";
                 break;
 
-            case 5:         //  print client data by ID menu
+            case 4:         //  print client data by ID menu
                 cout << ">>> Enter the ID of the client whose data will be printed: ";
 
                 cin >> option1;
@@ -798,18 +786,21 @@ int main() {
                 } else if (option1 == -2) {       // quit
                     command = -2;
                     break;
-                } else cout << "Client " << option1-1 << ": " << clients.getSubscribers()[option1-1] << '\n';
+                } else cout << "Client " << option1 << ": " << clients.getSubscribers()[option1 - 1] << '\n';
 
                 break;
 
+            case 5:     //  print favourite client data
+                cout << "Your favourite client: " << favourite << '\n';
+                break;
 
             case 6:     //  print VIP client(s) data
-                if (VIPindex == 1) cout << "Stored VIP client: " << VIPclients.getSubscribers()[1] << '\n';
+                if (VIPindex == 1) cout << "Stored VIP client: " << VIPclients.getSubscribers()[0] << '\n';
                 else cout << "All stored VIP clients:\n" << VIPclients << '\n';
                 break;
 
             case 7:         // print all stored clients
-                cout << "All stored clients:\n" << clients;
+                cout << "All stored clients:\n" << clients << '\n';
                 break;
 
             case -1:         // abort
@@ -818,10 +809,11 @@ int main() {
             case -2:         // quit
                 break;
             default:
-                cout << "Error: out of range function-menu (1-7) and command (-1,-2) IDs\n";
+                cout << "Error: out of range function-menu (1-5) and command (-1,-2) IDs\n";
                 break;
         }
     }
 
+    cout << "Last client ID: " << Person::getIDglobal();
     return 0;
 }
